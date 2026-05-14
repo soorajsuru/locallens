@@ -1,30 +1,29 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { PageHeader, Avatar } from "@/components/AppShell";
-import { guides, getUser } from "@/lib/mockData";
+import { getLocalLensDataFn } from "@/lib/data";
 import { MessageCircle, MapPin, Clock, Check, X, Lightbulb } from "lucide-react";
 
 export const Route = createFileRoute("/_app/guides/$guideId")({
-  head: ({ params }) => {
-    const g = guides.find((x) => x.id === params.guideId);
-    return { meta: [{ title: g ? `${g.title} · LocalLens` : "Guide · LocalLens" }] };
-  },
+  head: () => ({ meta: [{ title: "Guide · LocalLens" }] }),
   component: GuideDetail,
   notFoundComponent: () => (
     <div className="p-12 text-center">
       <p className="text-muted-foreground">Guide not found.</p>
-      <Link to="/guides" className="text-teal hover:underline text-sm">Back to guides</Link>
+      <Link to="/guides" className="text-teal hover:underline text-sm">
+        Back to guides
+      </Link>
     </div>
   ),
-  loader: ({ params }) => {
-    const g = guides.find((x) => x.id === params.guideId);
-    if (!g) throw notFound();
-    return { guide: g };
+  loader: async ({ params }) => {
+    const data = await getLocalLensDataFn();
+    const guide = data.guides.find((x) => x.id === params.guideId);
+    if (!guide) throw notFound();
+    return { guide, author: data.usersById[guide.authorId] ?? data.currentUser };
   },
 });
 
 function GuideDetail() {
-  const { guide } = Route.useLoaderData();
-  const author = getUser(guide.authorId);
+  const { guide, author } = Route.useLoaderData();
 
   return (
     <>
@@ -47,8 +46,18 @@ function GuideDetail() {
           </Link>
         </div>
 
-        <Section title="Must visit" items={guide.mustVisit} icon={<MapPin className="h-4 w-4" />} accent="teal" />
-        <Section title="Hidden spots" items={guide.hiddenSpots} icon={<Lightbulb className="h-4 w-4" />} accent="accent" />
+        <Section
+          title="Must visit"
+          items={guide.mustVisit}
+          icon={<MapPin className="h-4 w-4" />}
+          accent="teal"
+        />
+        <Section
+          title="Hidden spots"
+          items={guide.hiddenSpots}
+          icon={<Lightbulb className="h-4 w-4" />}
+          accent="accent"
+        />
         <div className="my-6 rounded-2xl border border-border bg-card p-5">
           <p className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 mb-2">
             <Clock className="h-3.5 w-3.5" /> Best timings
@@ -58,10 +67,19 @@ function GuideDetail() {
 
         <div className="grid md:grid-cols-2 gap-5">
           <ListBox title="Do's" items={guide.dos} icon={<Check className="h-4 w-4 text-teal" />} />
-          <ListBox title="Don'ts" items={guide.donts} icon={<X className="h-4 w-4 text-destructive" />} />
+          <ListBox
+            title="Don'ts"
+            items={guide.donts}
+            icon={<X className="h-4 w-4 text-destructive" />}
+          />
         </div>
 
-        <Section title="Tips" items={guide.tips} icon={<Lightbulb className="h-4 w-4" />} accent="accent" />
+        <Section
+          title="Tips"
+          items={guide.tips}
+          icon={<Lightbulb className="h-4 w-4" />}
+          accent="accent"
+        />
       </div>
     </>
   );
@@ -81,7 +99,9 @@ function Section({
   return (
     <section className="my-8">
       <h2 className="text-xl font-display text-primary flex items-center gap-2 mb-4">
-        <span className={`inline-grid place-items-center h-7 w-7 rounded-md ${accent === "teal" ? "bg-teal/15 text-teal" : "bg-accent/40 text-primary"}`}>
+        <span
+          className={`inline-grid place-items-center h-7 w-7 rounded-md ${accent === "teal" ? "bg-teal/15 text-teal" : "bg-accent/40 text-primary"}`}
+        >
           {icon}
         </span>
         {title}
@@ -97,7 +117,15 @@ function Section({
   );
 }
 
-function ListBox({ title, items, icon }: { title: string; items: string[]; icon: React.ReactNode }) {
+function ListBox({
+  title,
+  items,
+  icon,
+}: {
+  title: string;
+  items: string[];
+  icon: React.ReactNode;
+}) {
   return (
     <div className="rounded-2xl border border-border bg-card p-5">
       <h3 className="text-sm font-medium mb-3">{title}</h3>

@@ -122,8 +122,8 @@ export const guides: Guide[] = [
     city: "Jaipur",
     title: "Aarav's Jaipur — beyond the tourist circuit",
     mustVisit: [
-      "Nahargarh Fort at sunrise (not sunset — fewer people)",
-      "Rawat Mishthan Bhandar for pyaaz kachori, before 10am",
+      // "Nahargarh Fort at sunrise (not sunset — fewer people)",
+      // "Rawat Mishthan Bhandar for pyaaz kachori, before 10am",
       "Patrika Gate at golden hour, but enter from Jawahar Circle side",
     ],
     hiddenSpots: [

@@ -1,15 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageHeader, Avatar } from "@/components/AppShell";
-import { guides, getUser, cities } from "@/lib/mockData";
+import { getLocalLensDataFn } from "@/lib/data";
 import { Plus, MapPin } from "lucide-react";
 
 export const Route = createFileRoute("/_app/guides/")({
   head: () => ({ meta: [{ title: "Friend guides · LocalLens" }] }),
+  loader: async () => await getLocalLensDataFn(),
   component: GuidesIndex,
 });
 
 function GuidesIndex() {
+  const { guides, cities, usersById, currentUser } = Route.useLoaderData();
   const [filter, setFilter] = useState<string>("All");
   const visible = filter === "All" ? guides : guides.filter((g) => g.city === filter);
 
@@ -34,7 +36,9 @@ function GuidesIndex() {
             key={c}
             onClick={() => setFilter(c)}
             className={`text-xs px-3 py-1.5 rounded-full transition ${
-              filter === c ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
+              filter === c
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/70"
             }`}
           >
             {c}
@@ -44,7 +48,7 @@ function GuidesIndex() {
 
       <div className="px-6 md:px-10 pb-12 grid md:grid-cols-2 lg:grid-cols-3 gap-5">
         {visible.map((g) => {
-          const author = getUser(g.authorId);
+          const author = usersById[g.authorId] ?? currentUser;
           return (
             <Link
               key={g.id}

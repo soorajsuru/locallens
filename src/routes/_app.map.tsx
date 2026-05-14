@@ -1,16 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/AppShell";
-import {
-  cityMaps,
-  currentUser,
-  getUser,
-  guidePlacePins,
-  guides,
-  nearbyByCity,
-  type CityMap,
-  type Coordinates,
-} from "@/lib/mockData";
+import { getLocalLensDataFn } from "@/lib/data";
+import { type CityMap, type Coordinates } from "@/lib/db.server";
 import { BookOpen, MapPin, MessageCircle, Minus, Plus, UserRound } from "lucide-react";
 
 type ActivePin = { type: "friend"; id: string } | { type: "guide"; id: string } | null;
@@ -18,10 +10,13 @@ type MapLayer = "friends" | "places";
 
 export const Route = createFileRoute("/_app/map")({
   head: () => ({ meta: [{ title: "Nearby friends · LocalLens" }] }),
+  loader: async () => await getLocalLensDataFn(),
   component: MapPage,
 });
 
 function MapPage() {
+  const { cityMaps, currentUser, guidePlacePins, guides, nearbyByCity, usersById } =
+    Route.useLoaderData();
   const [city, setCity] = useState(currentUser.city);
   const [zoom, setZoom] = useState(13);
   const [mapLayer, setMapLayer] = useState<MapLayer>("friends");
@@ -40,7 +35,7 @@ function MapPage() {
     activePin?.type === "friend" ? friends.find((friend) => friend.id === activePin.id) : null;
   const activeGuidePin =
     activePin?.type === "guide" ? guidePins.find((pin) => pin.id === activePin.id) : null;
-  const activeUser = activeFriend ? getUser(activeFriend.id) : null;
+  const activeUser = activeFriend ? (usersById[activeFriend.id] ?? currentUser) : null;
   const activeGuide = activeGuidePin
     ? guides.find((guide) => guide.id === activeGuidePin.guideId)
     : null;
@@ -152,7 +147,7 @@ function MapPage() {
 
           {mapLayer === "friends" &&
             friends.map((friend) => {
-              const user = getUser(friend.id);
+              const user = usersById[friend.id] ?? currentUser;
               const position = toMapPosition(friend.coordinates, map, zoom);
               const isActive = activePin?.type === "friend" && activePin.id === friend.id;
 
@@ -231,7 +226,7 @@ function MapPage() {
               </h3>
               <div className="space-y-2">
                 {friends.map((friend) => {
-                  const user = getUser(friend.id);
+                  const user = usersById[friend.id] ?? currentUser;
                   const isActive = activePin?.type === "friend" && activePin.id === friend.id;
 
                   return (

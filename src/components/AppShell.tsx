@@ -1,7 +1,6 @@
 import { UserButton, useUser } from "@clerk/tanstack-react-start";
 import { Link, Outlet, useLocation } from "@tanstack/react-router";
 import { Compass, Home, Map, MessageCircle, BookOpen, Users, User } from "lucide-react";
-import { currentUser } from "@/lib/mockData";
 
 const nav = [
   { to: "/dashboard", label: "Feed", icon: Home },
@@ -15,7 +14,7 @@ const nav = [
 export function AppShell() {
   const { pathname } = useLocation();
   const { user } = useUser();
-  const displayName = user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? currentUser.name;
+  const displayName = user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? "You";
   const displayCity = user?.publicMetadata?.city;
 
   return (
@@ -53,7 +52,7 @@ export function AppShell() {
             <div className="min-w-0">
               <p className="text-sm font-medium truncate">{displayName}</p>
               <p className="text-xs text-sidebar-foreground/70 truncate">
-                📍 {typeof displayCity === "string" ? displayCity : currentUser.city}
+                📍 {typeof displayCity === "string" ? displayCity : "Jaipur"}
               </p>
             </div>
           </div>

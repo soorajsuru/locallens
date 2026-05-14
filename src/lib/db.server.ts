@@ -1,16 +1,70 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import type {
-  CityMap,
-  Conversation,
-  Guide,
-  GuidePlacePin,
-  Message,
-  NearbyFriend,
-  Post,
-  User,
-} from "@/lib/mockData";
+export type User = {
+  id: string;
+  name: string;
+  city: string;
+  bio: string;
+  avatar: string;
+  online?: boolean;
+};
+
+export type Guide = {
+  id: string;
+  authorId: string;
+  city: string;
+  title: string;
+  mustVisit: string[];
+  hiddenSpots: string[];
+  bestTimings: string;
+  dos: string[];
+  donts: string[];
+  tips: string[];
+  updatedAt: string;
+};
+
+export type Post = {
+  id: string;
+  authorId: string;
+  city: string;
+  area: string;
+  body: string;
+  tag: "traffic" | "weather" | "tip" | "event" | "warning";
+  createdAt: string;
+};
+
+export type Message = {
+  id: string;
+  fromId: string;
+  toId: string;
+  body: string;
+  at: string;
+  contextPlace?: string;
+};
+
+export type Conversation = {
+  friendId: string;
+  lastMessage: string;
+  at: string;
+  unread?: number;
+};
+
+export type Coordinates = { lat: number; lng: number };
+export type NearbyFriend = { id: string; place: string; coordinates: Coordinates };
+
+export type CityMap = {
+  center: Coordinates;
+  bbox: [west: number, south: number, east: number, north: number];
+};
+
+export type GuidePlacePin = {
+  id: string;
+  guideId: string;
+  name: string;
+  city: string;
+  coordinates: Coordinates;
+};
 
 const dbPath = join(process.cwd(), "data", "locallens.sqlite");
 
@@ -80,6 +134,7 @@ export type LocalLensData = {
   nearbyByCity: Record<string, NearbyFriend[]>;
   cityMaps: Record<string, CityMap>;
   guidePlacePins: GuidePlacePin[];
+  usersById: Record<string, User>;
 };
 
 export function getLocalLensData(): LocalLensData {
@@ -239,6 +294,7 @@ export function getLocalLensData(): LocalLensData {
     nearbyByCity,
     cityMaps,
     guidePlacePins,
+    usersById: Object.fromEntries(users.map((user) => [user.id, user])),
   };
 }
 

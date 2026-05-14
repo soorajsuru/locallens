@@ -1,15 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageHeader, Avatar } from "@/components/AppShell";
-import { currentUser, guides, posts } from "@/lib/mockData";
+import { getLocalLensDataFn } from "@/lib/data";
 import { MapPin } from "lucide-react";
 
 export const Route = createFileRoute("/_app/profile")({
   head: () => ({ meta: [{ title: "Profile · LocalLens" }] }),
+  loader: async () => await getLocalLensDataFn(),
   component: Profile,
 });
 
 function Profile() {
+  const { currentUser, guides, posts } = Route.useLoaderData();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(currentUser.name);
   const [city, setCity] = useState(currentUser.city);
@@ -75,7 +77,9 @@ function Profile() {
         <div className="grid gap-3 mb-8">
           {myGuides.length === 0 ? (
             <Empty>
-              <Link to="/guides/new" className="text-teal hover:underline">Write your first guide →</Link>
+              <Link to="/guides/new" className="text-teal hover:underline">
+                Write your first guide →
+              </Link>
             </Empty>
           ) : (
             myGuides.map((g) => (
@@ -86,7 +90,9 @@ function Profile() {
                 className="rounded-xl border border-border bg-card p-4 hover:border-teal/50"
               >
                 <p className="font-medium">{g.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{g.city} · {g.updatedAt}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {g.city} · {g.updatedAt}
+                </p>
               </Link>
             ))
           )}
@@ -94,12 +100,18 @@ function Profile() {
 
         <Stat label="Live updates posted" count={myPosts.length} />
         <div className="grid gap-3">
-          {myPosts.length === 0 ? <Empty>No posts yet.</Empty> : myPosts.map((p) => (
-            <div key={p.id} className="rounded-xl border border-border bg-card p-4 text-sm">
-              <p>{p.body}</p>
-              <p className="text-xs text-muted-foreground mt-1">{p.area}, {p.city} · {p.createdAt}</p>
-            </div>
-          ))}
+          {myPosts.length === 0 ? (
+            <Empty>No posts yet.</Empty>
+          ) : (
+            myPosts.map((p) => (
+              <div key={p.id} className="rounded-xl border border-border bg-card p-4 text-sm">
+                <p>{p.body}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {p.area}, {p.city} · {p.createdAt}
+                </p>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </>
@@ -116,5 +128,9 @@ function Stat({ label, count }: { label: string; count: number }) {
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">{children}</div>;
+  return (
+    <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+      {children}
+    </div>
+  );
 }

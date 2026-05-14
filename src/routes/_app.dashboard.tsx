@@ -1,23 +1,34 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageHeader, Avatar } from "@/components/AppShell";
-import { posts as initialPosts, getUser, currentUser, cities, type Post } from "@/lib/mockData";
+import { getLocalLensDataFn } from "@/lib/data";
+import { type Post } from "@/lib/db.server";
 import { AlertTriangle, Cloud, Sparkles, CalendarDays, Car, Send } from "lucide-react";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Live local feed · LocalLens" }] }),
+  loader: async () => await getLocalLensDataFn(),
   component: Dashboard,
 });
 
 const tagMeta = {
-  traffic: { icon: Car, label: "Traffic", color: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
+  traffic: {
+    icon: Car,
+    label: "Traffic",
+    color: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  },
   weather: { icon: Cloud, label: "Weather", color: "bg-sky-500/15 text-sky-700 dark:text-sky-300" },
   tip: { icon: Sparkles, label: "Tip", color: "bg-teal/20 text-teal" },
-  event: { icon: CalendarDays, label: "Event", color: "bg-violet-500/15 text-violet-700 dark:text-violet-300" },
+  event: {
+    icon: CalendarDays,
+    label: "Event",
+    color: "bg-violet-500/15 text-violet-700 dark:text-violet-300",
+  },
   warning: { icon: AlertTriangle, label: "Warning", color: "bg-destructive/15 text-destructive" },
 } as const;
 
 function Dashboard() {
+  const { posts: initialPosts, currentUser, cities, usersById } = Route.useLoaderData();
   const [city, setCity] = useState(currentUser.city);
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [draft, setDraft] = useState("");
@@ -62,10 +73,7 @@ function Dashboard() {
       <div className="px-6 md:px-10 py-8 grid lg:grid-cols-[1fr_320px] gap-8 max-w-6xl">
         <div className="space-y-5">
           {/* Composer */}
-          <form
-            onSubmit={publish}
-            className="rounded-2xl border border-border bg-card p-5"
-          >
+          <form onSubmit={publish} className="rounded-2xl border border-border bg-card p-5">
             <div className="flex items-start gap-3">
               <Avatar initials={currentUser.avatar} />
               <div className="flex-1">
@@ -83,7 +91,9 @@ function Dashboard() {
                         key={t}
                         onClick={() => setTag(t)}
                         className={`text-[11px] px-2.5 py-1 rounded-full transition ${
-                          tag === t ? tagMeta[t].color : "bg-muted text-muted-foreground hover:bg-muted/70"
+                          tag === t
+                            ? tagMeta[t].color
+                            : "bg-muted text-muted-foreground hover:bg-muted/70"
                         }`}
                       >
                         {tagMeta[t].label}
@@ -107,7 +117,9 @@ function Dashboard() {
               No live updates from {city} yet. Be the first.
             </div>
           ) : (
-            filtered.map((p) => <PostCard key={p.id} post={p} />)
+            filtered.map((p) => (
+              <PostCard key={p.id} post={p} author={usersById[p.authorId] ?? currentUser} />
+            ))
           )}
         </div>
 
@@ -115,20 +127,29 @@ function Dashboard() {
           <div className="rounded-2xl border border-border bg-card p-5">
             <h3 className="text-sm font-medium text-foreground mb-3">Do's & Don'ts in {city}</h3>
             <ul className="text-sm space-y-2 text-muted-foreground">
-              <li className="flex gap-2"><span className="text-teal">✓</span> Carry small change — autos rarely have it.</li>
-              <li className="flex gap-2"><span className="text-teal">✓</span> Bargain in bazaars — start at 40% of quoted.</li>
-              <li className="flex gap-2"><span className="text-destructive">✗</span> Don't accept "free" gem tours from touts.</li>
-              <li className="flex gap-2"><span className="text-destructive">✗</span> Don't drink tap water — bottled or filtered only.</li>
+              <li className="flex gap-2">
+                <span className="text-teal">✓</span> Carry small change — autos rarely have it.
+              </li>
+              <li className="flex gap-2">
+                <span className="text-teal">✓</span> Bargain in bazaars — start at 40% of quoted.
+              </li>
+              <li className="flex gap-2">
+                <span className="text-destructive">✗</span> Don't accept "free" gem tours from
+                touts.
+              </li>
+              <li className="flex gap-2">
+                <span className="text-destructive">✗</span> Don't drink tap water — bottled or
+                filtered only.
+              </li>
             </ul>
           </div>
 
           <div className="rounded-2xl border border-border gradient-shore p-5">
             <h3 className="text-sm font-medium text-foreground mb-1">3 friends are in {city}</h3>
-            <p className="text-xs text-muted-foreground mb-3">Tap to see where they are right now.</p>
-            <Link
-              to="/map"
-              className="inline-block text-sm text-teal hover:underline"
-            >
+            <p className="text-xs text-muted-foreground mb-3">
+              Tap to see where they are right now.
+            </p>
+            <Link to="/map" className="inline-block text-sm text-teal hover:underline">
               Open nearby map →
             </Link>
           </div>
@@ -138,8 +159,7 @@ function Dashboard() {
   );
 }
 
-function PostCard({ post }: { post: Post }) {
-  const author = getUser(post.authorId);
+function PostCard({ post, author }: { post: Post; author: { avatar: string; name: string } }) {
   const meta = tagMeta[post.tag];
   const Icon = meta.icon;
   return (
@@ -148,11 +168,16 @@ function PostCard({ post }: { post: Post }) {
         <Avatar initials={author.avatar} size={36} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-foreground truncate">
-            {author.name} <span className="text-muted-foreground font-normal">· {post.area}, {post.city}</span>
+            {author.name}{" "}
+            <span className="text-muted-foreground font-normal">
+              · {post.area}, {post.city}
+            </span>
           </p>
           <p className="text-xs text-muted-foreground">{post.createdAt}</p>
         </div>
-        <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full ${meta.color}`}>
+        <span
+          className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full ${meta.color}`}
+        >
           <Icon className="h-3 w-3" /> {meta.label}
         </span>
       </div>

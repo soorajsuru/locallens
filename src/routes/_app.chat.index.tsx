@@ -1,14 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader, Avatar } from "@/components/AppShell";
-import { conversations, getUser } from "@/lib/mockData";
+import { getLocalLensDataFn } from "@/lib/data";
 import { MessageCircle } from "lucide-react";
 
 export const Route = createFileRoute("/_app/chat/")({
   head: () => ({ meta: [{ title: "Chat · LocalLens" }] }),
+  loader: async () => await getLocalLensDataFn(),
   component: ChatList,
 });
 
 function ChatList() {
+  const { conversations, usersById, currentUser } = Route.useLoaderData();
+
   return (
     <>
       <PageHeader title="Chats" subtitle="Conversations stay tied to the places you discuss." />
@@ -21,7 +24,7 @@ function ChatList() {
         ) : (
           <ul className="divide-y divide-border rounded-2xl border border-border bg-card overflow-hidden">
             {conversations.map((c) => {
-              const u = getUser(c.friendId);
+              const u = usersById[c.friendId] ?? currentUser;
               return (
                 <li key={c.friendId}>
                   <Link

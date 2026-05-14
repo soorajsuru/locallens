@@ -1,25 +1,32 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader, Avatar } from "@/components/AppShell";
-import { users, friendIds, currentUser } from "@/lib/mockData";
+import { getLocalLensDataFn } from "@/lib/data";
 import { UserPlus, MessageCircle, Check } from "lucide-react";
 import { useState } from "react";
 
 export const Route = createFileRoute("/_app/friends")({
   head: () => ({ meta: [{ title: "Friends · LocalLens" }] }),
+  loader: async () => await getLocalLensDataFn(),
   component: FriendsPage,
 });
 
 function FriendsPage() {
+  const { users, friendIds, currentUser } = Route.useLoaderData();
   const [added, setAdded] = useState<Record<string, boolean>>({});
   const friends = users.filter((u) => friendIds.includes(u.id));
   const suggestions = users.filter((u) => u.id !== currentUser.id && !friendIds.includes(u.id));
 
   return (
     <>
-      <PageHeader title="Your circle" subtitle="The people whose word means more than a star rating." />
+      <PageHeader
+        title="Your circle"
+        subtitle="The people whose word means more than a star rating."
+      />
 
       <div className="px-6 md:px-10 py-8 max-w-5xl">
-        <h2 className="text-xs uppercase tracking-wider text-muted-foreground mb-4">Friends ({friends.length})</h2>
+        <h2 className="text-xs uppercase tracking-wider text-muted-foreground mb-4">
+          Friends ({friends.length})
+        </h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {friends.map((u) => (
             <div key={u.id} className="rounded-2xl border border-border bg-card p-5">
@@ -27,7 +34,10 @@ function FriendsPage() {
                 <Avatar initials={u.avatar} />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium truncate">{u.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">📍 {u.city}{u.online && " · online"}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    📍 {u.city}
+                    {u.online && " · online"}
+                  </p>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground line-clamp-2 mb-3">{u.bio}</p>
@@ -44,7 +54,9 @@ function FriendsPage() {
 
         {suggestions.length > 0 && (
           <>
-            <h2 className="text-xs uppercase tracking-wider text-muted-foreground mt-12 mb-4">Suggested</h2>
+            <h2 className="text-xs uppercase tracking-wider text-muted-foreground mt-12 mb-4">
+              Suggested
+            </h2>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {suggestions.map((u) => (
                 <div key={u.id} className="rounded-2xl border border-border bg-card p-5">
@@ -65,7 +77,15 @@ function FriendsPage() {
                         : "gradient-ocean text-white hover:opacity-95"
                     }`}
                   >
-                    {added[u.id] ? <><Check className="h-3.5 w-3.5" /> Request sent</> : <><UserPlus className="h-3.5 w-3.5" /> Add friend</>}
+                    {added[u.id] ? (
+                      <>
+                        <Check className="h-3.5 w-3.5" /> Request sent
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="h-3.5 w-3.5" /> Add friend
+                      </>
+                    )}
                   </button>
                 </div>
               ))}

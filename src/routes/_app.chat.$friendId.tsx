@@ -1,26 +1,28 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import { Avatar } from "@/components/AppShell";
-import { messagesByFriend, getUser, currentUser, type Message } from "@/lib/mockData";
+import { getLocalLensDataFn } from "@/lib/data";
+import { type Message } from "@/lib/db.server";
 import { ArrowLeft, Send, MapPin } from "lucide-react";
 
 export const Route = createFileRoute("/_app/chat/$friendId")({
-  head: ({ params }) => {
-    const u = getUser(params.friendId);
-    return { meta: [{ title: `Chat with ${u.name} · LocalLens` }] };
-  },
-  loader: ({ params }) => {
-    const friend = getUser(params.friendId);
+  head: () => ({ meta: [{ title: "Chat · LocalLens" }] }),
+  loader: async ({ params }) => {
+    const data = await getLocalLensDataFn();
+    const friend = data.usersById[params.friendId];
     if (!friend) throw notFound();
-    return { friend };
+    return {
+      currentUser: data.currentUser,
+      friend,
+      initialMessages: data.messagesByFriend[friend.id] ?? [],
+    };
   },
   component: ChatRoom,
 });
 
 function ChatRoom() {
-  const { friend } = Route.useLoaderData();
-  const initial = messagesByFriend[friend.id] ?? [];
-  const [messages, setMessages] = useState<Message[]>(initial);
+  const { currentUser, friend, initialMessages } = Route.useLoaderData();
+  const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -64,11 +66,17 @@ function ChatRoom() {
         <Avatar initials={friend.avatar} size={36} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium truncate">{friend.name}</p>
-          <p className="text-xs text-muted-foreground truncate">📍 {friend.city}{friend.online && " · online"}</p>
+          <p className="text-xs text-muted-foreground truncate">
+            📍 {friend.city}
+            {friend.online && " · online"}
+          </p>
         </div>
       </header>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-3 bg-background">
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-3 bg-background"
+      >
         {messages.map((m) => {
           const mine = m.fromId === currentUser.id;
           return (
@@ -91,7 +99,11 @@ function ChatRoom() {
                   </Link>
                 )}
                 <p>{m.body}</p>
-                <p className={`text-[10px] mt-1 ${mine ? "text-white/60" : "text-muted-foreground"}`}>{m.at}</p>
+                <p
+                  className={`text-[10px] mt-1 ${mine ? "text-white/60" : "text-muted-foreground"}`}
+                >
+                  {m.at}
+                </p>
               </div>
             </div>
           );
