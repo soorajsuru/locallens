@@ -1,3 +1,4 @@
+import { ClerkProvider } from "@clerk/tanstack-react-start";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -73,10 +74,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "LocalLens — Travel by people, not algorithms" },
-      { name: "description", content: "Real-time, human-centric local insights from friends and trusted locals." },
+      {
+        name: "description",
+        content: "Real-time, human-centric local insights from friends and trusted locals.",
+      },
       { name: "author", content: "LocalLens" },
       { property: "og:title", content: "LocalLens" },
-      { property: "og:description", content: "Friend guides, live local feed, and chat tied to places you visit." },
+      {
+        property: "og:description",
+        content: "Friend guides, live local feed, and chat tied to places you visit.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
@@ -101,7 +108,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        <ClerkProvider>{children}</ClerkProvider>
         <Scripts />
       </body>
     </html>

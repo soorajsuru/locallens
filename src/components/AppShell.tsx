@@ -1,3 +1,4 @@
+import { UserButton, useUser } from "@clerk/tanstack-react-start";
 import { Link, Outlet, useLocation } from "@tanstack/react-router";
 import { Compass, Home, Map, MessageCircle, BookOpen, Users, User } from "lucide-react";
 import { currentUser } from "@/lib/mockData";
@@ -13,6 +14,10 @@ const nav = [
 
 export function AppShell() {
   const { pathname } = useLocation();
+  const { user } = useUser();
+  const displayName = user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? currentUser.name;
+  const displayCity = user?.publicMetadata?.city;
+
   return (
     <div className="min-h-screen bg-background text-foreground flex">
       {/* Sidebar */}
@@ -44,12 +49,12 @@ export function AppShell() {
         </nav>
         <div className="mt-auto p-4 border-t border-sidebar-border">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-teal text-teal-foreground grid place-items-center text-sm font-medium">
-              {currentUser.avatar}
-            </div>
+            <UserButton />
             <div className="min-w-0">
-              <p className="text-sm font-medium truncate">{currentUser.name}</p>
-              <p className="text-xs text-sidebar-foreground/70 truncate">📍 {currentUser.city}</p>
+              <p className="text-sm font-medium truncate">{displayName}</p>
+              <p className="text-xs text-sidebar-foreground/70 truncate">
+                📍 {typeof displayCity === "string" ? displayCity : currentUser.city}
+              </p>
             </div>
           </div>
         </div>

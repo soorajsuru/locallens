@@ -9,9 +9,12 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "db:init": "mkdir -p data && sqlite3 data/locallens.sqlite < db/schema.sql && sqlite3 data/locallens.sqlite < db/seed.sql",
+    "db:reset": "rm -f data/locallens.sqlite && npm run db:init"
   },
   "dependencies": {
+    "@clerk/tanstack-react-start": "^1.2.3",
     "@cloudflare/vite-plugin": "^1.25.5",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",

@@ -42,6 +42,13 @@ export type Message = {
   contextPlace?: string;
 };
 
+export type Conversation = {
+  friendId: string;
+  lastMessage: string;
+  at: string;
+  unread?: number;
+};
+
 export const currentUser: User = {
   id: "u_me",
   name: "You",
@@ -259,12 +266,7 @@ export const posts: Post[] = [
   },
 ];
 
-export const conversations: {
-  friendId: string;
-  lastMessage: string;
-  at: string;
-  unread?: number;
-}[] = [
+export const conversations: Conversation[] = [
   {
     friendId: "u1",
     lastMessage: "Try LMB on MI Road, ground floor only — upstairs is overpriced 🙌",
