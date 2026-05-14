@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
+import { useUser } from "@clerk/tanstack-react-start";
 import { Avatar } from "@/components/AppShell";
 import { getLocalLensDataFn } from "@/lib/data";
 import { type Message } from "@/lib/db.server";
@@ -9,52 +10,151 @@ export const Route = createFileRoute("/_app/chat/$friendId")({
   head: () => ({ meta: [{ title: "Chat · LocalLens" }] }),
   loader: async ({ params }) => {
     const data = await getLocalLensDataFn();
-    const friend = data.usersById[params.friendId];
-    if (!friend) throw notFound();
+    const friend =
+      data.usersById[params.friendId] ?? {
+        id: params.friendId,
+        name: `Friend`,
+        city: "Unknown",
+        bio: "",
+        avatar: params.friendId.slice(0, 2).toUpperCase(),
+      };
     return {
-      currentUser: data.currentUser,
       friend,
-      initialMessages: data.messagesByFriend[friend.id] ?? [],
     };
   },
   component: ChatRoom,
 });
 
 function ChatRoom() {
-  const { currentUser, friend, initialMessages } = Route.useLoaderData();
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const { friend } = Route.useLoaderData();
+  const { user } = useUser();
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  if (!user) {
+    return null;
+  }
   const [draft, setDraft] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [chatUrl, setChatUrl] = useState("");
+  const [copyStatus, setCopyStatus] = useState("Copy link");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const chatClientRef = useRef<any>(null);
+  const channelRef = useRef<any>(null);
+
+  const currentUser = {
+    id: user?.id ?? "u_me",
+    name: user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? "You",
+  };
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setChatUrl(`${window.location.origin}/chat/${friend.id}`);
+    }
+  }, [friend.id]);
+
+  function copyChatLink() {
+    if (!chatUrl) return;
+    navigator.clipboard.writeText(chatUrl).then(
+      () => setCopyStatus("Copied!"),
+      () => setCopyStatus("Copy failed")
+    );
+    setTimeout(() => setCopyStatus("Copy link"), 2000);
+  }
+
+  const mapStreamMessage = (message: any): Message => ({
+    id: message.id ?? `m_${Date.now()}`,
+    fromId: message.user?.id ?? currentUser.id,
+    toId: message.user?.id === currentUser.id ? friend.id : currentUser.id,
+    body: typeof message.text === "string" ? message.text : "",
+    at: new Date(message.created_at ?? Date.now()).toLocaleTimeString(),
+    contextPlace: typeof message.custom?.contextPlace === "string" ? message.custom.contextPlace : undefined,
+  });
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
-  function send(e: React.FormEvent) {
-    e.preventDefault();
-    if (!draft.trim()) return;
-    const msg: Message = {
-      id: "m_" + Date.now(),
-      fromId: currentUser.id,
-      toId: friend.id,
-      body: draft.trim(),
-      at: "now",
+  useEffect(() => {
+    let active = true;
+
+    async function initStreamChat() {
+      try {
+        const response = await fetch("/api/chat/token", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            userId: currentUser.id,
+            name: currentUser.name,
+            friendId: friend.id,
+            friendName: friend.name,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error ?? "Could not generate chat token");
+        }
+
+        const { StreamChat } = await import("stream-chat");
+        const client = StreamChat.getInstance(data.apiKey);
+        await client.connectUser({ id: currentUser.id, name: currentUser.name }, data.userToken);
+
+        const channelId = [currentUser.id, friend.id].sort().join("_");
+        const channel = client.channel("messaging", channelId, {
+          members: [currentUser.id, friend.id],
+          name: `Chat with ${friend.name}`,
+        } as any);
+
+        await channel.watch();
+
+        if (!active) return;
+
+        chatClientRef.current = client;
+        channelRef.current = channel;
+        setMessages(channel.state.messages.map(mapStreamMessage));
+
+        channel.on("message.new", (event: any) => {
+          const newMessage = mapStreamMessage(event.message);
+          setMessages((prev) => (prev.some((m) => m.id === newMessage.id) ? prev : [...prev, newMessage]));
+        });
+
+        client.on("typing.start", (event: any) => {
+          if (event.user?.id === friend.id) {
+            setIsTyping(true);
+          }
+        });
+
+        client.on("typing.stop", (event: any) => {
+          if (event.user?.id === friend.id) {
+            setIsTyping(false);
+          }
+        });
+      } catch (error) {
+        console.error("Stream chat init failed", error);
+      }
+    }
+
+    initStreamChat();
+
+    return () => {
+      active = false;
+      channelRef.current?.off("message.new");
+      chatClientRef.current?.disconnectUser();
     };
-    setMessages([...messages, msg]);
+  }, [currentUser.id, currentUser.name, friend.id, friend.name]);
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    if (!draft.trim() || !channelRef.current) return;
+
+    const text = draft.trim();
     setDraft("");
-    // simulated reply
-    setTimeout(() => {
-      setMessages((m) => [
-        ...m,
-        {
-          id: "m_" + Date.now() + "_r",
-          fromId: friend.id,
-          toId: currentUser.id,
-          body: "Got it — let me think and send a few options 👀",
-          at: "now",
-        },
-      ]);
-    }, 1200);
+
+    try {
+      await channelRef.current.sendMessage({ text });
+    } catch (error) {
+      console.error("Chat send failed", error);
+    }
   }
 
   return (
@@ -68,9 +168,16 @@ function ChatRoom() {
           <p className="text-sm font-medium truncate">{friend.name}</p>
           <p className="text-xs text-muted-foreground truncate">
             📍 {friend.city}
-            {friend.online && " · online"}
+            {friend.online ? " · online" : " · offline"}
           </p>
         </div>
+        <button
+          type="button"
+          onClick={copyChatLink}
+          className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:border-foreground"
+        >
+          {copyStatus}
+        </button>
       </header>
 
       <div
@@ -91,6 +198,7 @@ function ChatRoom() {
                 {m.contextPlace && (
                   <Link
                     to="/guides"
+                    search={{ city: undefined }}
                     className={`flex items-center gap-1 text-[11px] mb-1.5 px-2 py-1 rounded-md ${
                       mine ? "bg-white/15" : "bg-accent/30 text-primary"
                     }`}
@@ -108,6 +216,15 @@ function ChatRoom() {
             </div>
           );
         })}
+        {isTyping && (
+          <div className="flex justify-start">
+            <div className="max-w-[50%] rounded-2xl bg-card border border-border px-4 py-2.5 text-[15px] leading-relaxed rounded-bl-sm">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="h-2 w-2 rounded-full bg-teal animate-pulse" /> Typing...
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <form onSubmit={send} className="border-t border-border bg-card p-3 flex items-center gap-2">
