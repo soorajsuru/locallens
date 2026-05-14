@@ -13,6 +13,7 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppStorybookRouteImport } from './routes/_app.storybook'
 import { Route as AppProfileRouteImport } from './routes/_app.profile'
 import { Route as AppMapRouteImport } from './routes/_app.map'
 import { Route as AppFriendsRouteImport } from './routes/_app.friends'
@@ -41,6 +42,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppStorybookRoute = AppStorybookRouteImport.update({
+  id: '/storybook',
+  path: '/storybook',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppProfileRoute = AppProfileRouteImport.update({
   id: '/profile',
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/friends': typeof AppFriendsRoute
   '/map': typeof AppMapRoute
   '/profile': typeof AppProfileRoute
+  '/storybook': typeof AppStorybookRoute
   '/chat/$friendId': typeof AppChatFriendIdRoute
   '/guides/$guideId': typeof AppGuidesGuideIdRoute
   '/guides/new': typeof AppGuidesNewRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/friends': typeof AppFriendsRoute
   '/map': typeof AppMapRoute
   '/profile': typeof AppProfileRoute
+  '/storybook': typeof AppStorybookRoute
   '/chat/$friendId': typeof AppChatFriendIdRoute
   '/guides/$guideId': typeof AppGuidesGuideIdRoute
   '/guides/new': typeof AppGuidesNewRoute
@@ -126,6 +134,7 @@ export interface FileRoutesById {
   '/_app/friends': typeof AppFriendsRoute
   '/_app/map': typeof AppMapRoute
   '/_app/profile': typeof AppProfileRoute
+  '/_app/storybook': typeof AppStorybookRoute
   '/_app/chat/$friendId': typeof AppChatFriendIdRoute
   '/_app/guides/$guideId': typeof AppGuidesGuideIdRoute
   '/_app/guides/new': typeof AppGuidesNewRoute
@@ -142,6 +151,7 @@ export interface FileRouteTypes {
     | '/friends'
     | '/map'
     | '/profile'
+    | '/storybook'
     | '/chat/$friendId'
     | '/guides/$guideId'
     | '/guides/new'
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/friends'
     | '/map'
     | '/profile'
+    | '/storybook'
     | '/chat/$friendId'
     | '/guides/$guideId'
     | '/guides/new'
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/_app/friends'
     | '/_app/map'
     | '/_app/profile'
+    | '/_app/storybook'
     | '/_app/chat/$friendId'
     | '/_app/guides/$guideId'
     | '/_app/guides/new'
@@ -214,6 +226,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/storybook': {
+      id: '/_app/storybook'
+      path: '/storybook'
+      fullPath: '/storybook'
+      preLoaderRoute: typeof AppStorybookRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/profile': {
       id: '/_app/profile'
@@ -286,6 +305,7 @@ interface AppRouteChildren {
   AppFriendsRoute: typeof AppFriendsRoute
   AppMapRoute: typeof AppMapRoute
   AppProfileRoute: typeof AppProfileRoute
+  AppStorybookRoute: typeof AppStorybookRoute
   AppChatFriendIdRoute: typeof AppChatFriendIdRoute
   AppGuidesGuideIdRoute: typeof AppGuidesGuideIdRoute
   AppGuidesNewRoute: typeof AppGuidesNewRoute
@@ -298,6 +318,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppFriendsRoute: AppFriendsRoute,
   AppMapRoute: AppMapRoute,
   AppProfileRoute: AppProfileRoute,
+  AppStorybookRoute: AppStorybookRoute,
   AppChatFriendIdRoute: AppChatFriendIdRoute,
   AppGuidesGuideIdRoute: AppGuidesGuideIdRoute,
   AppGuidesNewRoute: AppGuidesNewRoute,

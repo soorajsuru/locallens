@@ -98,8 +98,19 @@ CREATE TABLE IF NOT EXISTS guide_places (
   FOREIGN KEY (guide_id) REFERENCES guides(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS city_top_places (
+  id TEXT PRIMARY KEY,
+  city TEXT NOT NULL,
+  rank INTEGER NOT NULL CHECK (rank BETWEEN 1 AND 10),
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  image_url TEXT NOT NULL,
+  UNIQUE (city, rank)
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_city ON users(city);
 CREATE INDEX IF NOT EXISTS idx_guides_city ON guides(city);
 CREATE INDEX IF NOT EXISTS idx_posts_city ON posts(city);
 CREATE INDEX IF NOT EXISTS idx_live_locations_city ON live_locations(city);
 CREATE INDEX IF NOT EXISTS idx_guide_places_city ON guide_places(city);
+CREATE INDEX IF NOT EXISTS idx_city_top_places_city ON city_top_places(city, rank);

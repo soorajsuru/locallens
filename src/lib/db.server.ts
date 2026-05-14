@@ -66,6 +66,15 @@ export type GuidePlacePin = {
   coordinates: Coordinates;
 };
 
+export type CityTopPlace = {
+  id: string;
+  city: string;
+  rank: number;
+  name: string;
+  description: string;
+  imageUrl: string;
+};
+
 const dbPath = join(process.cwd(), "data", "locallens.sqlite");
 
 type DbUser = Omit<User, "online"> & {
@@ -114,6 +123,10 @@ type DbGuidePlace = {
   lng: number;
 };
 
+type DbCityTopPlace = Omit<CityTopPlace, "imageUrl"> & {
+  imageUrl: string;
+};
+
 type DbConversation = Conversation & {
   unread: number | null;
 };
@@ -134,6 +147,7 @@ export type LocalLensData = {
   nearbyByCity: Record<string, NearbyFriend[]>;
   cityMaps: Record<string, CityMap>;
   guidePlacePins: GuidePlacePin[];
+  topPlacesByCity: Record<string, CityTopPlace[]>;
   usersById: Record<string, User>;
 };
 
@@ -282,6 +296,23 @@ export function getLocalLensData(): LocalLensData {
     coordinates: { lat: place.lat, lng: place.lng },
   }));
 
+  const topPlacesByCity = query<DbCityTopPlace>(`
+    SELECT
+      id,
+      city,
+      rank,
+      name,
+      description,
+      image_url AS imageUrl
+    FROM city_top_places
+    ORDER BY city, rank
+  `).reduce<Record<string, CityTopPlace[]>>((acc, place) => {
+    acc[place.city] ??= [];
+    acc[place.city].push(place);
+
+    return acc;
+  }, {});
+
   return {
     currentUser,
     users,
@@ -294,6 +325,7 @@ export function getLocalLensData(): LocalLensData {
     nearbyByCity,
     cityMaps,
     guidePlacePins,
+    topPlacesByCity,
     usersById: Object.fromEntries(users.map((user) => [user.id, user])),
   };
 }
