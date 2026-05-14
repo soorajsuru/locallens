@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/AppShell";
 import { getLocalLensDataFn } from "@/lib/data";
 import { type CityMap, type Coordinates } from "@/lib/db.server";
@@ -19,6 +19,8 @@ function MapPage() {
     Route.useLoaderData();
   const [city, setCity] = useState(currentUser.city);
   const [zoom, setZoom] = useState(13);
+  const pinchRef = useRef<{ distance: number; zoom: number } | null>(null);
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
   const [mapLayer, setMapLayer] = useState<MapLayer>("friends");
   const friends = nearbyByCity[city] ?? [];
   const map = cityMaps[city] ?? cityMaps[currentUser.city];
@@ -76,7 +78,50 @@ function MapPage() {
       />
 
       <div className="px-6 md:px-10 py-8 grid xl:grid-cols-[minmax(0,1fr)_320px] gap-6 max-w-7xl">
-        <div className="relative min-h-[520px] overflow-hidden rounded-2xl border border-border bg-surface">
+        <div
+          className="relative min-h-[520px] touch-none overflow-hidden rounded-2xl border border-border bg-surface"
+          onPointerDown={(event) => {
+            pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            event.currentTarget.setPointerCapture(event.pointerId);
+
+            if (pointersRef.current.size === 2) {
+              pinchRef.current = {
+                distance: getPointerDistance(pointersRef.current),
+                zoom,
+              };
+            }
+          }}
+          onPointerMove={(event) => {
+            if (!pointersRef.current.has(event.pointerId)) return;
+
+            pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+            if (pointersRef.current.size !== 2 || !pinchRef.current) return;
+
+            const nextDistance = getPointerDistance(pointersRef.current);
+            if (nextDistance <= 0 || pinchRef.current.distance <= 0) return;
+
+            const nextZoom =
+              pinchRef.current.zoom + Math.log2(nextDistance / pinchRef.current.distance);
+            setZoom(clamp(Math.round(nextZoom), 11, 16));
+          }}
+          onPointerUp={(event) => {
+            pointersRef.current.delete(event.pointerId);
+            pinchRef.current = null;
+          }}
+          onPointerCancel={(event) => {
+            pointersRef.current.delete(event.pointerId);
+            pinchRef.current = null;
+          }}
+          onLostPointerCapture={(event) => {
+            pointersRef.current.delete(event.pointerId);
+            pinchRef.current = null;
+          }}
+          onWheel={(event) => {
+            event.preventDefault();
+            setZoom((value) => clamp(value + (event.deltaY > 0 ? -0.35 : 0.35), 11, 16));
+          }}
+        >
           <div className="absolute inset-0 bg-[#d8e0d4]">
             {tiles.map((tile) => (
               <img
@@ -322,11 +367,12 @@ function MapPage() {
 }
 
 function getVisibleTiles(center: Coordinates, zoom: number) {
-  const centerPoint = latLngToWorldPixel(center, zoom);
+  const tileZoom = Math.round(zoom);
+  const centerPoint = latLngToWorldPixel(center, tileZoom);
   const centerTileX = Math.floor(centerPoint.x / tileSize);
   const centerTileY = Math.floor(centerPoint.y / tileSize);
   const tiles: { x: number; y: number; z: number; left: number; top: number }[] = [];
-  const tileCount = 2 ** zoom;
+  const tileCount = 2 ** tileZoom;
 
   for (let x = centerTileX - 3; x <= centerTileX + 3; x += 1) {
     for (let y = centerTileY - 3; y <= centerTileY + 3; y += 1) {
@@ -337,7 +383,7 @@ function getVisibleTiles(center: Coordinates, zoom: number) {
       tiles.push({
         x: wrappedX,
         y,
-        z: zoom,
+        z: tileZoom,
         left: x * tileSize - centerPoint.x,
         top: y * tileSize - centerPoint.y,
       });
@@ -371,4 +417,11 @@ function latLngToWorldPixel(coordinates: Coordinates, zoom: number) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function getPointerDistance(pointers: Map<number, { x: number; y: number }>) {
+  const [first, second] = Array.from(pointers.values());
+  if (!first || !second) return 0;
+
+  return Math.hypot(second.x - first.x, second.y - first.y);
 }
