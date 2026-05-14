@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/AppShell";
 import { getLocalLensDataFn } from "@/lib/data";
 import { type CityMap, type Coordinates } from "@/lib/db.server";
+import { getStoredSelectedCity, storeSelectedCity } from "@/lib/placeSelection";
 import { BookOpen, MapPin, MessageCircle, Minus, Plus, UserRound } from "lucide-react";
 
 type ActivePin = { type: "friend"; id: string } | { type: "guide"; id: string } | null;
@@ -10,6 +11,9 @@ type MapLayer = "friends" | "places";
 
 export const Route = createFileRoute("/_app/map")({
   head: () => ({ meta: [{ title: "Nearby friends · LocalLens" }] }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    city: typeof search.city === "string" ? search.city : undefined,
+  }),
   loader: async () => await getLocalLensDataFn(),
   component: MapPage,
 });
@@ -17,13 +21,21 @@ export const Route = createFileRoute("/_app/map")({
 function MapPage() {
   const { cityMaps, currentUser, guidePlacePins, guides, nearbyByCity, usersById } =
     Route.useLoaderData();
-  const [city, setCity] = useState(currentUser.city);
+  const search = Route.useSearch();
+  const storedCity = getStoredSelectedCity();
+  const initialCity =
+    search.city && cityMaps[search.city]
+      ? search.city
+      : storedCity && cityMaps[storedCity]
+        ? storedCity
+        : "";
+  const [city, setCity] = useState(initialCity);
   const [zoom, setZoom] = useState(13);
   const pinchRef = useRef<{ distance: number; zoom: number } | null>(null);
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
   const [mapLayer, setMapLayer] = useState<MapLayer>("friends");
   const friends = nearbyByCity[city] ?? [];
-  const map = cityMaps[city] ?? cityMaps[currentUser.city];
+  const map = city ? cityMaps[city] : null;
   const guidePins = guidePlacePins.filter((pin) => pin.city === city);
   const [activePin, setActivePin] = useState<ActivePin>(
     friends[0]
@@ -41,7 +53,7 @@ function MapPage() {
   const activeGuide = activeGuidePin
     ? guides.find((guide) => guide.id === activeGuidePin.guideId)
     : null;
-  const tiles = useMemo(() => getVisibleTiles(map.center, zoom), [map.center, zoom]);
+  const tiles = useMemo(() => (map ? getVisibleTiles(map.center, zoom) : []), [map, zoom]);
   const visiblePinsCount = mapLayer === "friends" ? friends.length : guidePins.length;
 
   return (
@@ -58,6 +70,7 @@ function MapPage() {
               const nextGuidePins = guidePlacePins.filter((pin) => pin.city === nextCity);
 
               setCity(nextCity);
+              storeSelectedCity(nextCity);
               setZoom(13);
               setMapLayer(nextFriends.length > 0 ? "friends" : "places");
               setActivePin(
@@ -70,6 +83,7 @@ function MapPage() {
             }}
             className="rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
+            <option value="">Choose a city</option>
             {Object.keys(cityMaps).map((c) => (
               <option key={c}>{c}</option>
             ))}
@@ -78,7 +92,8 @@ function MapPage() {
       />
 
       <div className="px-6 md:px-10 py-8 grid xl:grid-cols-[minmax(0,1fr)_320px] gap-6 max-w-7xl">
-        <div
+        {map ? (
+          <div
           className="relative min-h-[520px] touch-none overflow-hidden rounded-2xl border border-border bg-surface"
           onPointerDown={(event) => {
             pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -121,7 +136,7 @@ function MapPage() {
             event.preventDefault();
             setZoom((value) => clamp(value + (event.deltaY > 0 ? -0.35 : 0.35), 11, 16));
           }}
-        >
+          >
           <div className="absolute inset-0 bg-[#d8e0d4]">
             {tiles.map((tile) => (
               <img
@@ -261,7 +276,17 @@ function MapPage() {
               No {mapLayer === "friends" ? "friends" : "guide places"} in {city} yet.
             </div>
           )}
-        </div>
+          </div>
+        ) : (
+          <div className="grid min-h-[520px] place-items-center rounded-2xl border border-dashed border-border bg-surface p-8 text-center">
+            <div>
+              <p className="text-lg font-display text-primary">Choose a city to see nearby places</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Search from the dashboard or select a city here to load the matching map.
+              </p>
+            </div>
+          </div>
+        )}
 
         <aside className="space-y-4">
           {mapLayer === "friends" ? (

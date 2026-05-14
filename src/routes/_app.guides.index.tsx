@@ -2,17 +2,29 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageHeader, Avatar } from "@/components/AppShell";
 import { getLocalLensDataFn } from "@/lib/data";
+import { getStoredSelectedCity, storeSelectedCity } from "@/lib/placeSelection";
 import { Plus, MapPin } from "lucide-react";
 
 export const Route = createFileRoute("/_app/guides/")({
   head: () => ({ meta: [{ title: "Friend guides · LocalLens" }] }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    city: typeof search.city === "string" ? search.city : undefined,
+  }),
   loader: async () => await getLocalLensDataFn(),
   component: GuidesIndex,
 });
 
 function GuidesIndex() {
   const { guides, cities, usersById, currentUser } = Route.useLoaderData();
-  const [filter, setFilter] = useState<string>("All");
+  const search = Route.useSearch();
+  const storedCity = getStoredSelectedCity();
+  const initialFilter =
+    search.city && cities.includes(search.city)
+      ? search.city
+      : storedCity && cities.includes(storedCity)
+        ? storedCity
+        : "All";
+  const [filter, setFilter] = useState<string>(initialFilter);
   const visible = filter === "All" ? guides : guides.filter((g) => g.city === filter);
 
   return (
@@ -34,7 +46,10 @@ function GuidesIndex() {
         {["All", ...cities].map((c) => (
           <button
             key={c}
-            onClick={() => setFilter(c)}
+            onClick={() => {
+              setFilter(c);
+              storeSelectedCity(c === "All" ? "" : c);
+            }}
             className={`text-xs px-3 py-1.5 rounded-full transition ${
               filter === c
                 ? "bg-primary text-primary-foreground"

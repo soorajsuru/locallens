@@ -1,25 +1,39 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader, Avatar } from "@/components/AppShell";
 import { getLocalLensDataFn } from "@/lib/data";
+import { getStoredSelectedCity } from "@/lib/placeSelection";
 import { UserPlus, MessageCircle, Check } from "lucide-react";
 import { useState } from "react";
 
 export const Route = createFileRoute("/_app/friends")({
   head: () => ({ meta: [{ title: "Friends · LocalLens" }] }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    city: typeof search.city === "string" ? search.city : undefined,
+  }),
   loader: async () => await getLocalLensDataFn(),
   component: FriendsPage,
 });
 
 function FriendsPage() {
-  const { users, friendIds, currentUser } = Route.useLoaderData();
+  const { users, friendIds, currentUser, cities } = Route.useLoaderData();
+  const search = Route.useSearch();
+  const storedCity = getStoredSelectedCity();
+  const city =
+    search.city && cities.includes(search.city)
+      ? search.city
+      : storedCity && cities.includes(storedCity)
+        ? storedCity
+        : "";
   const [added, setAdded] = useState<Record<string, boolean>>({});
-  const friends = users.filter((u) => friendIds.includes(u.id));
-  const suggestions = users.filter((u) => u.id !== currentUser.id && !friendIds.includes(u.id));
+  const friends = users.filter((u) => friendIds.includes(u.id) && (!city || u.city === city));
+  const suggestions = users.filter(
+    (u) => u.id !== currentUser.id && !friendIds.includes(u.id) && (!city || u.city === city),
+  );
 
   return (
     <>
       <PageHeader
-        title="Your circle"
+        title={city ? `Your circle in ${city}` : "Your circle"}
         subtitle="The people whose word means more than a star rating."
       />
 
