@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/AppShell";
 import { getLocalLensDataFn } from "@/lib/data";
 import { type CityMap, type Coordinates } from "@/lib/db.server";
@@ -34,9 +34,19 @@ function MapPage() {
   const pinchRef = useRef<{ distance: number; zoom: number } | null>(null);
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
   const [mapLayer, setMapLayer] = useState<MapLayer>("friends");
+  const [selectedGuideId, setSelectedGuideId] = useState<string | null>(null);
   const friends = nearbyByCity[city] ?? [];
   const map = city ? cityMaps[city] : null;
-  const guidePins = guidePlacePins.filter((pin) => pin.city === city);
+  const cityGuides = useMemo(() => guides.filter((guide) => guide.city === city), [city, guides]);
+  const guidePins = useMemo(
+    () => guidePlacePins.filter((pin) => pin.city === city),
+    [city, guidePlacePins],
+  );
+  const visibleGuidePins = useMemo(
+    () =>
+      selectedGuideId ? guidePins.filter((pin) => pin.guideId === selectedGuideId) : guidePins,
+    [guidePins, selectedGuideId],
+  );
   const [activePin, setActivePin] = useState<ActivePin>(
     friends[0]
       ? { type: "friend", id: friends[0].id }
@@ -48,13 +58,49 @@ function MapPage() {
   const activeFriend =
     activePin?.type === "friend" ? friends.find((friend) => friend.id === activePin.id) : null;
   const activeGuidePin =
-    activePin?.type === "guide" ? guidePins.find((pin) => pin.id === activePin.id) : null;
+    activePin?.type === "guide" ? visibleGuidePins.find((pin) => pin.id === activePin.id) : null;
   const activeUser = activeFriend ? (usersById[activeFriend.id] ?? currentUser) : null;
   const activeGuide = activeGuidePin
     ? guides.find((guide) => guide.id === activeGuidePin.guideId)
     : null;
   const tiles = useMemo(() => (map ? getVisibleTiles(map.center, zoom) : []), [map, zoom]);
-  const visiblePinsCount = mapLayer === "friends" ? friends.length : guidePins.length;
+  const visiblePinsCount = mapLayer === "friends" ? friends.length : visibleGuidePins.length;
+
+  useEffect(() => {
+    if (city || search.city) return;
+
+    const nextCity = getStoredSelectedCity();
+    if (!nextCity || !cityMaps[nextCity]) return;
+
+    setCity(nextCity);
+  }, [city, cityMaps, search.city]);
+
+  useEffect(() => {
+    if (!city) {
+      setActivePin(null);
+      setSelectedGuideId(null);
+      return;
+    }
+
+    if (mapLayer === "friends") {
+      setActivePin((current) =>
+        current?.type === "friend" && friends.some((friend) => friend.id === current.id)
+          ? current
+          : friends[0]
+            ? { type: "friend", id: friends[0].id }
+            : null,
+      );
+      return;
+    }
+
+    setActivePin((current) =>
+      current?.type === "guide" && visibleGuidePins.some((pin) => pin.id === current.id)
+        ? current
+        : visibleGuidePins[0]
+          ? { type: "guide", id: visibleGuidePins[0].id }
+          : null,
+    );
+  }, [city, friends, visibleGuidePins, mapLayer]);
 
   return (
     <>
@@ -71,6 +117,7 @@ function MapPage() {
 
               setCity(nextCity);
               storeSelectedCity(nextCity);
+              setSelectedGuideId(null);
               setZoom(13);
               setMapLayer(nextFriends.length > 0 ? "friends" : "places");
               setActivePin(
@@ -94,48 +141,48 @@ function MapPage() {
       <div className="px-6 md:px-10 py-8 grid xl:grid-cols-[minmax(0,1fr)_320px] gap-6 max-w-7xl">
         {map ? (
           <div
-          className="relative min-h-[520px] touch-none overflow-hidden rounded-2xl border border-border bg-surface"
-          onPointerDown={(event) => {
-            pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-            event.currentTarget.setPointerCapture(event.pointerId);
+            className="relative min-h-[520px] touch-none overflow-hidden rounded-2xl border border-border bg-surface"
+            onPointerDown={(event) => {
+              pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+              event.currentTarget.setPointerCapture(event.pointerId);
 
-            if (pointersRef.current.size === 2) {
-              pinchRef.current = {
-                distance: getPointerDistance(pointersRef.current),
-                zoom,
-              };
-            }
-          }}
-          onPointerMove={(event) => {
-            if (!pointersRef.current.has(event.pointerId)) return;
+              if (pointersRef.current.size === 2) {
+                pinchRef.current = {
+                  distance: getPointerDistance(pointersRef.current),
+                  zoom,
+                };
+              }
+            }}
+            onPointerMove={(event) => {
+              if (!pointersRef.current.has(event.pointerId)) return;
 
-            pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+              pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
 
-            if (pointersRef.current.size !== 2 || !pinchRef.current) return;
+              if (pointersRef.current.size !== 2 || !pinchRef.current) return;
 
-            const nextDistance = getPointerDistance(pointersRef.current);
-            if (nextDistance <= 0 || pinchRef.current.distance <= 0) return;
+              const nextDistance = getPointerDistance(pointersRef.current);
+              if (nextDistance <= 0 || pinchRef.current.distance <= 0) return;
 
-            const nextZoom =
-              pinchRef.current.zoom + Math.log2(nextDistance / pinchRef.current.distance);
-            setZoom(clamp(Math.round(nextZoom), 11, 16));
-          }}
-          onPointerUp={(event) => {
-            pointersRef.current.delete(event.pointerId);
-            pinchRef.current = null;
-          }}
-          onPointerCancel={(event) => {
-            pointersRef.current.delete(event.pointerId);
-            pinchRef.current = null;
-          }}
-          onLostPointerCapture={(event) => {
-            pointersRef.current.delete(event.pointerId);
-            pinchRef.current = null;
-          }}
-          onWheel={(event) => {
-            event.preventDefault();
-            setZoom((value) => clamp(value + (event.deltaY > 0 ? -0.35 : 0.35), 11, 16));
-          }}
+              const nextZoom =
+                pinchRef.current.zoom + Math.log2(nextDistance / pinchRef.current.distance);
+              setZoom(clamp(Math.round(nextZoom), 11, 16));
+            }}
+            onPointerUp={(event) => {
+              pointersRef.current.delete(event.pointerId);
+              pinchRef.current = null;
+            }}
+            onPointerCancel={(event) => {
+              pointersRef.current.delete(event.pointerId);
+              pinchRef.current = null;
+            }}
+            onLostPointerCapture={(event) => {
+              pointersRef.current.delete(event.pointerId);
+              pinchRef.current = null;
+            }}
+            onWheel={(event) => {
+              event.preventDefault();
+              setZoom((value) => clamp(value + (event.deltaY > 0 ? -0.35 : 0.35), 11, 16));
+            }}
           >
           <div className="absolute inset-0 bg-[#d8e0d4]">
             {tiles.map((tile) => (
@@ -154,10 +201,14 @@ function MapPage() {
           </div>
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/30 via-transparent to-background/20" />
 
-          <div className="absolute left-4 top-4 flex flex-wrap gap-2 rounded-lg border border-border bg-card/95 p-2 text-xs shadow-sm backdrop-blur">
+          <div
+            className="absolute left-4 top-4 flex flex-wrap gap-2 rounded-lg border border-border bg-card/95 p-2 text-xs shadow-sm backdrop-blur"
+            onPointerDown={(event) => event.stopPropagation()}
+          >
             <button
               type="button"
               onClick={() => {
+                setSelectedGuideId(null);
                 setMapLayer("friends");
                 setActivePin(friends[0] ? { type: "friend", id: friends[0].id } : null);
               }}
@@ -172,8 +223,14 @@ function MapPage() {
             <button
               type="button"
               onClick={() => {
+                const nextGuideId = selectedGuideId ?? cityGuides[0]?.id ?? null;
+                const nextPins = nextGuideId
+                  ? guidePins.filter((pin) => pin.guideId === nextGuideId)
+                  : guidePins;
+
+                setSelectedGuideId(nextGuideId);
                 setMapLayer("places");
-                setActivePin(guidePins[0] ? { type: "guide", id: guidePins[0].id } : null);
+                setActivePin(nextPins[0] ? { type: "guide", id: nextPins[0].id } : null);
               }}
               className={`inline-flex items-center gap-1.5 rounded-md px-3 py-2 transition ${
                 mapLayer === "places"
@@ -185,7 +242,10 @@ function MapPage() {
             </button>
           </div>
 
-          <div className="absolute right-4 top-4 overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+          <div
+            className="absolute right-4 top-4 overflow-hidden rounded-lg border border-border bg-card shadow-sm"
+            onPointerDown={(event) => event.stopPropagation()}
+          >
             <button
               type="button"
               onClick={() => setZoom((value) => clamp(value + 1, 11, 16))}
@@ -240,7 +300,7 @@ function MapPage() {
             })}
 
           {mapLayer === "places" &&
-            guidePins.map((pin) => {
+            visibleGuidePins.map((pin) => {
               const position = toMapPosition(pin.coordinates, map, zoom);
               const isActive = activePin?.type === "guide" && activePin.id === pin.id;
 
@@ -289,10 +349,47 @@ function MapPage() {
         )}
 
         <aside className="space-y-4">
-          {mapLayer === "friends" ? (
+          <section className="rounded-xl border border-border bg-card p-4">
+            <h3 className="mb-3 text-xs uppercase tracking-wider text-muted-foreground">
+              Guides in {city || "this city"}
+            </h3>
+            <div className="space-y-2">
+              {cityGuides.map((guide) => {
+                const pins = guidePins.filter((pin) => pin.guideId === guide.id);
+                const isSelected = mapLayer === "places" && selectedGuideId === guide.id;
+
+                return (
+                  <button
+                    key={guide.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedGuideId(guide.id);
+                      setMapLayer("places");
+                      setActivePin(pins[0] ? { type: "guide", id: pins[0].id } : null);
+                    }}
+                    className={`w-full rounded-lg border p-3 text-left transition ${
+                      isSelected ? "border-primary bg-muted" : "border-border hover:bg-muted/70"
+                    }`}
+                  >
+                    <p className="text-sm font-medium">{guide.title}</p>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <BookOpen className="h-3.5 w-3.5" /> {pins.length} places to visit
+                    </p>
+                  </button>
+                );
+              })}
+              {cityGuides.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {city ? "No guides for this city yet." : "Choose a city to see guides."}
+                </p>
+              )}
+            </div>
+          </section>
+
+          {mapLayer === "friends" && (
             <section className="rounded-xl border border-border bg-card p-4">
               <h3 className="mb-3 text-xs uppercase tracking-wider text-muted-foreground">
-                Friends in {city}
+                Friends in {city || "this city"}
               </h3>
               <div className="space-y-2">
                 {friends.map((friend) => {
@@ -302,6 +399,7 @@ function MapPage() {
                   return (
                     <button
                       key={friend.id}
+                      type="button"
                       onClick={() => setActivePin({ type: "friend", id: friend.id })}
                       className={`w-full rounded-lg border p-3 text-left transition ${
                         isActive ? "border-teal bg-muted" : "border-border hover:bg-muted/70"
@@ -319,32 +417,33 @@ function MapPage() {
                 )}
               </div>
             </section>
-          ) : (
+          )}
+
+          {mapLayer === "places" && (
             <section className="rounded-xl border border-border bg-card p-4">
               <h3 className="mb-3 text-xs uppercase tracking-wider text-muted-foreground">
-                Guide places
+                Places to visit
               </h3>
               <div className="space-y-2">
-                {guidePins.map((pin) => {
-                  const guide = guides.find((g) => g.id === pin.guideId);
+                {visibleGuidePins.map((pin) => {
                   const isActive = activePin?.type === "guide" && activePin.id === pin.id;
 
                   return (
                     <button
                       key={pin.id}
+                      type="button"
                       onClick={() => setActivePin({ type: "guide", id: pin.id })}
                       className={`w-full rounded-lg border p-3 text-left transition ${
                         isActive ? "border-primary bg-muted" : "border-border hover:bg-muted/70"
                       }`}
                     >
                       <p className="text-sm font-medium">{pin.name}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{guide?.title}</p>
                     </button>
                   );
                 })}
-                {guidePins.length === 0 && (
+                {visibleGuidePins.length === 0 && (
                   <p className="text-sm text-muted-foreground">
-                    No guide places for this city yet.
+                    Select a guide to show its recommended places.
                   </p>
                 )}
               </div>
