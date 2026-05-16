@@ -26,13 +26,21 @@ export function AuthFrame({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen grid md:grid-cols-2">
-      <div className="hidden md:flex gradient-ocean text-white p-12 flex-col justify-between">
+    <div className="grid min-h-screen bg-background text-foreground md:grid-cols-[1.05fr_0.95fr]">
+      <div className="relative hidden overflow-hidden gradient-ocean p-12 text-white md:flex md:flex-col md:justify-between">
+        <div
+          aria-hidden
+          className="absolute -right-28 top-16 h-80 w-80 rounded-full bg-white/10 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="absolute bottom-24 left-10 h-56 w-56 rounded-full bg-teal/20 blur-3xl"
+        />
         <Link to="/" className="flex items-center gap-2">
           <Compass className="h-6 w-6" />
           <span className="text-xl font-display">LocalLens</span>
         </Link>
-        <div>
+        <div className="relative rounded-[2rem] border border-white/18 bg-white/10 p-8 shadow-2xl backdrop-blur">
           <p className="text-xs uppercase tracking-[0.2em] text-white/70 mb-4">
             From a friend in Jaipur
           </p>
@@ -44,8 +52,8 @@ export function AuthFrame({
         </div>
         <p className="text-xs text-white/60">© LocalLens</p>
       </div>
-      <div className="flex items-center justify-center p-8">
-        <div className="w-full max-w-sm">
+      <div className="app-surface flex items-center justify-center p-6 md:p-8">
+        <div className="w-full max-w-md rounded-[2rem] border border-border/80 bg-card/82 p-6 shadow-2xl shadow-primary/5 backdrop-blur-xl md:p-8">
           <div className="flex justify-end mb-6">
             <ThemeToggle />
           </div>
