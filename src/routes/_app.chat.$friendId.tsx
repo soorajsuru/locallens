@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import { useUser } from "@clerk/tanstack-react-start";
 import { Avatar } from "@/components/AppShell";
@@ -29,21 +29,18 @@ function ChatRoom() {
   const { friend } = Route.useLoaderData();
   const { user } = useUser();
   const [messages, setMessages] = useState<Message[]>([]);
-
-  if (!user) {
-    return null;
-  }
   const [draft, setDraft] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [channelReady, setChannelReady] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
   const [chatUrl, setChatUrl] = useState("");
   const [copyStatus, setCopyStatus] = useState("Copy link");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const chatClientRef = useRef<any>(null);
-  const channelRef = useRef<any>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   const currentUser = {
-    id: user?.id ?? "u_me",
-    name: user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? "You",
+    id: user?.id ?? "u_demo",
+    name: user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? "Demo User",
   };
 
   useEffect(() => {
@@ -61,15 +58,6 @@ function ChatRoom() {
     setTimeout(() => setCopyStatus("Copy link"), 2000);
   }
 
-  const mapStreamMessage = (message: any): Message => ({
-    id: message.id ?? `m_${Date.now()}`,
-    fromId: message.user?.id ?? currentUser.id,
-    toId: message.user?.id === currentUser.id ? friend.id : currentUser.id,
-    body: typeof message.text === "string" ? message.text : "",
-    at: new Date(message.created_at ?? Date.now()).toLocaleTimeString(),
-    contextPlace: typeof message.custom?.contextPlace === "string" ? message.custom.contextPlace : undefined,
-  });
-
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
@@ -77,83 +65,77 @@ function ChatRoom() {
   useEffect(() => {
     let active = true;
 
-    async function initStreamChat() {
+    async function initLocalChat() {
       try {
-        const response = await fetch("/api/chat/token", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            userId: currentUser.id,
-            name: currentUser.name,
-            friendId: friend.id,
-            friendName: friend.name,
-          }),
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.error ?? "Could not generate chat token");
+        const historyResponse = await fetch(`/api/chat/history/${friend.id}`);
+        const historyData = await historyResponse.json();
+        if (active && Array.isArray(historyData.messages)) {
+          setMessages(historyData.messages);
         }
-
-        const { StreamChat } = await import("stream-chat");
-        const client = StreamChat.getInstance(data.apiKey);
-        await client.connectUser({ id: currentUser.id, name: currentUser.name }, data.userToken);
-
-        const channelId = [currentUser.id, friend.id].sort().join("_");
-        const channel = client.channel("messaging", channelId, {
-          members: [currentUser.id, friend.id],
-          name: `Chat with ${friend.name}`,
-        } as any);
-
-        await channel.watch();
-
-        if (!active) return;
-
-        chatClientRef.current = client;
-        channelRef.current = channel;
-        setMessages(channel.state.messages.map(mapStreamMessage));
-
-        channel.on("message.new", (event: any) => {
-          const newMessage = mapStreamMessage(event.message);
-          setMessages((prev) => (prev.some((m) => m.id === newMessage.id) ? prev : [...prev, newMessage]));
-        });
-
-        client.on("typing.start", (event: any) => {
-          if (event.user?.id === friend.id) {
-            setIsTyping(true);
-          }
-        });
-
-        client.on("typing.stop", (event: any) => {
-          if (event.user?.id === friend.id) {
-            setIsTyping(false);
-          }
-        });
       } catch (error) {
-        console.error("Stream chat init failed", error);
+        console.error("Failed to load chat history", error);
       }
+
+      const source = new EventSource(`/api/chat/stream/${friend.id}`);
+      source.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data);
+          if (parsed?.type === "message") {
+            const message = parsed.message as Message;
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === message.id)) return prev;
+              return [...prev, message];
+            });
+          } else if (parsed?.type === "typing") {
+            setIsTyping(parsed.friendId === friend.id);
+            setTimeout(() => setIsTyping(false), 1200);
+          }
+        } catch (error) {
+          console.error("Failed to parse SSE chat event", error);
+        }
+      };
+
+      source.onerror = (error) => {
+        console.error("Chat stream error", error);
+        source.close();
+      };
+
+      eventSourceRef.current = source;
+      setChannelReady(true);
     }
 
-    initStreamChat();
+    initLocalChat();
 
     return () => {
       active = false;
-      channelRef.current?.off("message.new");
-      chatClientRef.current?.disconnectUser();
+      eventSourceRef.current?.close();
     };
-  }, [currentUser.id, currentUser.name, friend.id, friend.name]);
+  }, [friend.id]);
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
-    if (!draft.trim() || !channelRef.current) return;
+    if (!draft.trim()) {
+      console.warn("[Chat] Cannot send message: draft is empty");
+      return;
+    }
 
     const text = draft.trim();
     setDraft("");
 
     try {
-      await channelRef.current.sendMessage({ text });
+      await fetch("/api/chat/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          friendId: friend.id,
+          fromId: currentUser.id,
+          text,
+          id: `m_${Date.now()}`,
+        }),
+      });
     } catch (error) {
-      console.error("Chat send failed", error);
+      console.error("[Chat] Message send failed", error);
+      setDraft(text);
     }
   }
 
@@ -227,20 +209,28 @@ function ChatRoom() {
         )}
       </div>
 
-      <form onSubmit={send} className="border-t border-border bg-card p-3 flex items-center gap-2">
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={`Ask ${friend.name.split(" ")[0]}...`}
-          className="flex-1 rounded-full border border-input bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        />
-        <button
-          type="submit"
-          disabled={!draft.trim()}
-          className="h-10 w-10 grid place-items-center rounded-full gradient-ocean text-white disabled:opacity-40"
-        >
-          <Send className="h-4 w-4" />
-        </button>
+      <form onSubmit={send} className="border-t border-border bg-card p-3 flex flex-col gap-2">
+        {initError && (
+          <div className="text-xs text-orange-600 bg-orange-50 px-3 py-2 rounded">
+            ⚠️ Chat initialization issue: {initError}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={`Ask ${friend.name.split(" ")[0]}...`}
+            className="flex-1 rounded-full border border-input bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          <button
+            type="submit"
+            disabled={!draft.trim()}
+            title={!channelReady ? "Connecting to chat..." : "Send message"}
+            className="h-10 w-10 grid place-items-center rounded-full gradient-ocean text-white disabled:opacity-40"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </div>
       </form>
     </div>
   );

@@ -135,42 +135,53 @@ async function createStreamToken(userId: string, secret: string) {
 }
 
 async function handleChatToken(request: Request, env: unknown) {
-  const body = await request.json();
-  const userId = body.userId as string | undefined;
-  const userName = body.name as string | undefined;
-  const friendId = body.friendId as string | undefined;
-  const friendName = body.friendName as string | undefined;
+  try {
+    const body = await request.json();
+    const userId = body.userId as string | undefined;
+    const userName = body.name as string | undefined;
+    const friendId = body.friendId as string | undefined;
+    const friendName = body.friendName as string | undefined;
 
-  if (!userId || !userName) {
-    return new Response(JSON.stringify({ error: "userId and name are required" }), {
-      status: 400,
+    console.log("[handleChatToken] Received request:", { userId, userName, friendId, friendName });
+
+    if (!userId || !userName) {
+      return new Response(JSON.stringify({ error: "userId and name are required" }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
+    const apiKey = getEnvValue(env, "GETSTREAM_API_KEY");
+    const apiSecret = getEnvValue(env, "GETSTREAM_API_SECRET");
+    console.log("[handleChatToken] Env values:", { hasApiKey: !!apiKey, hasApiSecret: !!apiSecret });
+
+    if (!apiKey || !apiSecret) {
+      return new Response(JSON.stringify({ error: "Chat API credentials are not configured" }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
+    const users: Record<string, { name: string }> = {
+      [userId]: { name: userName },
+    };
+
+    if (friendId) {
+      users[friendId] = { name: friendName ?? friendId };
+    }
+
+    console.log("[handleChatToken] Ensuring Stream users...");
+    await ensureStreamUsers(apiKey, apiSecret, users);
+
+    const userToken = await createStreamToken(userId, apiSecret);
+    console.log("[handleChatToken] Token created successfully");
+    return new Response(JSON.stringify({ apiKey, userToken, userId }), {
       headers: { "content-type": "application/json" },
     });
+  } catch (error) {
+    console.error("[handleChatToken] Error:", error);
+    throw error;
   }
-
-  const apiKey = getEnvValue(env, "GETSTREAM_API_KEY");
-  const apiSecret = getEnvValue(env, "GETSTREAM_API_SECRET");
-  if (!apiKey || !apiSecret) {
-    return new Response(JSON.stringify({ error: "Chat API credentials are not configured" }), {
-      status: 500,
-      headers: { "content-type": "application/json" },
-    });
-  }
-
-  const users: Record<string, { name: string }> = {
-    [userId]: { name: userName },
-  };
-
-  if (friendId) {
-    users[friendId] = { name: friendName ?? friendId };
-  }
-
-  await ensureStreamUsers(apiKey, apiSecret, users);
-
-  const userToken = await createStreamToken(userId, apiSecret);
-  return new Response(JSON.stringify({ apiKey, userToken, userId }), {
-    headers: { "content-type": "application/json" },
-  });
 }
 
 async function handleChatStream(request: Request, url: URL) {
@@ -248,22 +259,23 @@ async function handleChatSend(request: Request) {
 
   addChatMessage(userMessage);
   broadcastChatEvent(friendId, { type: "message", message: userMessage });
-  broadcastChatEvent(friendId, { type: "typing", friendId });
-
-  setTimeout(() => {
-    const reply: ChatMessage = {
-      id: `m_${Date.now()}_r`,
-      friendId,
-      fromId: friendId,
-      toId: fromId,
-      body: `Sure — I saw your message and I’m checking the best local options for you.`,
-      at: new Date().toLocaleTimeString(),
-    };
-    addChatMessage(reply);
-    broadcastChatEvent(friendId, { type: "message", message: reply });
-  }, 1200);
 
   return new Response(JSON.stringify({ ok: true }), {
+    headers: { "content-type": "application/json" },
+  });
+}
+
+async function handleChatHistory(url: URL) {
+  const friendId = url.pathname.split("/").pop();
+  if (!friendId) {
+    return new Response(JSON.stringify({ error: "Missing friendId" }), {
+      status: 400,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  const state = getChatServiceState();
+  return new Response(JSON.stringify({ messages: state.messages.get(friendId) ?? [] }), {
     headers: { "content-type": "application/json" },
   });
 }
@@ -333,14 +345,22 @@ export default {
       const url = new URL(request.url);
 
       if (url.pathname === "/api/chat/token" && request.method === "POST") {
+        console.log("[server] Handling /api/chat/token");
         return await handleChatToken(request, env);
       }
 
+      if (url.pathname.startsWith("/api/chat/history/")) {
+        console.log("[server] Handling /api/chat/history/");
+        return await handleChatHistory(url);
+      }
+
       if (url.pathname.startsWith("/api/chat/stream/")) {
+        console.log("[server] Handling /api/chat/stream/");
         return await handleChatStream(request, url);
       }
 
       if (url.pathname === "/api/chat/send" && request.method === "POST") {
+        console.log("[server] Handling /api/chat/send");
         return await handleChatSend(request);
       }
 
@@ -348,7 +368,7 @@ export default {
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
-      console.error(error);
+      console.error("[server] Uncaught error:", error);
       return brandedErrorResponse();
     }
   },
