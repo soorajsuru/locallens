@@ -6,6 +6,7 @@ import { type Post } from "@/lib/db.server";
 import { getStoredSelectedCity, storeSelectedCity } from "@/lib/placeSelection";
 import {
   AlertTriangle,
+  ArrowRight,
   BookOpen,
   CalendarDays,
   Car,
@@ -210,6 +211,63 @@ function Dashboard() {
               </div>
             </div>
           </form>
+
+          {hasSelectedPlace && (
+            <section className="rounded-2xl border border-border bg-card p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-teal">Choose a guide</p>
+                  <h2 className="mt-1 text-2xl font-display text-primary">
+                    Build a travel itinerary for {city}
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Select one local guide to compare their recommendations with the city top ten.
+                  </p>
+                </div>
+                <span className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+                  {cityGuides.length} guides
+                </span>
+              </div>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {cityGuides.map((guide) => {
+                  const author = usersById[guide.authorId] ?? currentUser;
+
+                  return (
+                    <Link
+                      key={guide.id}
+                      to="/travel-itinerary"
+                      search={{ city, guideId: guide.id }}
+                      className="group rounded-xl border border-border bg-surface p-4 transition hover:border-teal/60 hover:bg-muted/50"
+                    >
+                      <div className="flex items-start gap-3">
+                        <Avatar initials={author.avatar} size={38} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium leading-snug text-foreground">
+                            {guide.title}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {author.name} · Updated {guide.updatedAt}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            {guide.mustVisit.slice(0, 2).map((place) => (
+                              <span
+                                key={place}
+                                className="rounded-full bg-card px-2 py-1 text-[11px] text-muted-foreground"
+                              >
+                                {place.split(" at ")[0].split(" for ")[0]}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <ArrowRight className="mt-1 h-4 w-4 text-teal transition group-hover:translate-x-0.5" />
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           {filtered.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
