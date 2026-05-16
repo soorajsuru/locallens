@@ -8,6 +8,155 @@ LocalLens is a full-stack TypeScript web application built with React and TanSta
 
 The project uses Clerk for authentication, Stream Chat credentials for chat token generation, SQLite for local development data, and Cloudflare Workers configuration for deployment.
 
+## Architecture Diagrams
+
+### Full Application Workflow
+
+```mermaid
+flowchart TD
+  U[User / Traveler] --> B[Browser]
+
+  B --> FE[React 19 Frontend]
+  FE --> TSR[TanStack Router<br/>File-based routes]
+
+  TSR --> Landing[Landing Page<br/>/]
+  TSR --> Login[Login / Signup<br/>/login /signup]
+  TSR --> AppShell[Authenticated App Shell<br/>/_app]
+
+  Login --> Clerk[Clerk Authentication]
+  Clerk --> AppShell
+
+  AppShell --> Dashboard[Dashboard<br/>/dashboard]
+  AppShell --> Guides[Friend Guides<br/>/guides]
+  AppShell --> GuideDetail[Guide Detail<br/>/guides/$guideId]
+  AppShell --> NewGuide[Create Guide<br/>/guides/new]
+  AppShell --> Map[Nearby Discovery<br/>/map]
+  AppShell --> Friends[Friends<br/>/friends]
+  AppShell --> ChatIndex[Chat List<br/>/chat]
+  AppShell --> ChatFriend[Place-aware Chat<br/>/chat/$friendId]
+  AppShell --> Itinerary[Travel Itinerary<br/>/travel-itinerary]
+  AppShell --> Profile[Profile<br/>/profile]
+
+  Dashboard --> DataFn[getLocalLensDataFn]
+  Guides --> DataFn
+  GuideDetail --> DataFn
+  Map --> DataFn
+  Friends --> DataFn
+  ChatIndex --> DataFn
+  Itinerary --> DataFn
+  Profile --> DataFn
+
+  DataFn --> DBServer[src/lib/db.server.ts]
+  DBServer --> SQLite[(SQLite Database<br/>data/locallens.sqlite)]
+
+  SQLite --> Tables[users<br/>friendships<br/>guides<br/>posts<br/>messages<br/>conversations<br/>city_maps<br/>live_locations<br/>guide_places<br/>city_top_places]
+
+  ChatFriend --> ChatHistory[GET /api/chat/history/:friendId]
+  ChatFriend --> ChatStream[EventSource<br/>/api/chat/stream/:friendId]
+  ChatFriend --> ChatSend[POST /api/chat/send]
+  ChatFriend --> ChatToken[POST /api/chat/token]
+
+  ChatHistory --> Server[src/server.ts]
+  ChatStream --> Server
+  ChatSend --> Server
+  ChatToken --> Server
+
+  Server --> MemoryChat[(In-memory Chat State<br/>messages + SSE clients)]
+  Server --> Stream[Stream Chat API]
+  Stream --> ChatToken
+
+  Server --> SSR[TanStack Start Server Entry]
+  SSR --> FE
+
+  subgraph Deployment
+    Vite[Vite Build]
+    Worker[Cloudflare Worker<br/>wrangler.jsonc]
+  end
+
+  FE --> Vite
+  Server --> Worker
+```
+
+### User Journey
+
+```mermaid
+journey
+  title LocalLens User Workflow
+  section Entry
+    Visit landing page: 5: User
+    Login or sign up: 4: User, Clerk
+    Redirect to dashboard: 5: Clerk, App
+  section Explore
+    View local dashboard insights: 5: User, App
+    Browse friend guides: 5: User, App
+    Open guide details: 4: User, App
+    Discover nearby places and friends: 5: User, App
+  section Data
+    Load app data through server function: 4: App
+    Query SQLite local database: 4: Server
+    Return guides, posts, users, places, messages: 5: Server, App
+  section Chat
+    Open friend chat: 5: User
+    Load chat history: 4: App, Server
+    Connect to live SSE stream: 4: App, Server
+    Send message: 5: User, Server
+    Broadcast message update: 5: Server, App
+  section Planning
+    Build travel itinerary: 5: User, App
+    Review profile and own guides: 4: User, App
+```
+
+### Technical Request Flow
+
+```mermaid
+sequenceDiagram
+  actor User
+  participant Browser
+  participant React as React UI
+  participant Router as TanStack Router
+  participant Clerk
+  participant Start as TanStack Start Server
+  participant DB as SQLite
+  participant API as Custom Chat API
+  participant Stream as Stream Chat API
+
+  User->>Browser: Open LocalLens
+  Browser->>React: Load app
+  React->>Router: Resolve route
+
+  alt Public route
+    Router->>React: Render landing/login/signup
+  else Protected app route
+    React->>Clerk: Check auth session
+    Clerk-->>React: Authenticated user
+    Router->>React: Render AppShell
+  end
+
+  React->>Start: getLocalLensDataFn()
+  Start->>DB: Query users, guides, posts, maps, messages
+  DB-->>Start: LocalLensData
+  Start-->>React: Return typed app data
+
+  React->>User: Show dashboard/guides/map/friends/profile
+
+  opt Chat page
+    React->>API: GET /api/chat/history/:friendId
+    API-->>React: Existing messages
+
+    React->>API: Connect /api/chat/stream/:friendId
+    API-->>React: Live SSE events
+
+    React->>API: POST /api/chat/send
+    API-->>React: Message sent
+    API-->>React: Broadcast message event
+
+    React->>API: POST /api/chat/token
+    API->>Stream: Upsert users
+    Stream-->>API: OK
+    API-->>React: apiKey + userToken
+  end
+```
+
 ## Features
 
 - User authentication with Clerk
