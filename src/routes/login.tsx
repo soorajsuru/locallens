@@ -1,6 +1,7 @@
 import { SignIn } from "@clerk/tanstack-react-start";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Compass } from "lucide-react";
+import { ThemeToggle } from "@/components/AppShell";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Log in · LocalLens" }] }),
@@ -45,6 +46,9 @@ export function AuthFrame({
       </div>
       <div className="flex items-center justify-center p-8">
         <div className="w-full max-w-sm">
+          <div className="flex justify-end mb-6">
+            <ThemeToggle />
+          </div>
           <h1 className="text-3xl font-display text-primary">{title}</h1>
           <p className="text-sm text-muted-foreground mt-1.5 mb-8">{subtitle}</p>
           {children}

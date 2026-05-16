@@ -1,6 +1,7 @@
 import { UserButton, useUser } from "@clerk/tanstack-react-start";
 import { Link, Outlet, useLocation } from "@tanstack/react-router";
-import { Compass, Home, Map, MessageCircle, BookOpen, Users, User } from "lucide-react";
+import { Compass, Home, Map, MessageCircle, BookOpen, Users, User, Moon, Sun } from "lucide-react";
+import { useEffect, useState } from "react";
 
 const nav = [
   { to: "/dashboard", label: "Feed", icon: Home },
@@ -61,6 +62,9 @@ export function AppShell() {
 
       {/* Main */}
       <main className="flex-1 min-w-0 pb-20 md:pb-0">
+        <div className="flex justify-end px-6 md:px-10 pt-6 pb-2">
+          <ThemeToggle />
+        </div>
         <Outlet />
       </main>
 
@@ -83,6 +87,37 @@ export function AppShell() {
         })}
       </nav>
     </div>
+  );
+}
+
+const themeStorageKey = "locallens:theme";
+
+export function ThemeToggle() {
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(themeStorageKey) as "light" | "dark" | null;
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const nextTheme = stored === "light" || stored === "dark" ? stored : prefersDark ? "dark" : "light";
+    setTheme(nextTheme);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    window.localStorage.setItem(themeStorageKey, theme);
+  }, [theme]);
+
+  const isDark = theme === "dark";
+
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      className="inline-flex items-center gap-2 rounded-full border border-border bg-card/95 px-4 py-2 text-sm font-medium text-foreground shadow-sm transition hover:border-teal/60 hover:bg-muted"
+    >
+      {isDark ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-teal" />}
+      {isDark ? "Light mode" : "Dark mode"}
+    </button>
   );
 }
 

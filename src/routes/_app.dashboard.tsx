@@ -213,23 +213,23 @@ function Dashboard() {
           </form>
 
           {hasSelectedPlace && (
-            <section className="rounded-2xl border border-border bg-card p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-teal">Choose a guide</p>
-                  <h2 className="mt-1 text-2xl font-display text-primary">
-                    Build a travel itinerary for {city}
+            <section className="rounded-[2rem] border border-teal/15 bg-gradient-to-br from-teal/15 via-surface/85 to-accent/15 p-6 shadow-[0_20px_60px_-35px_rgba(16,185,129,0.28)] dark:border-teal/30 dark:bg-surface/90 dark:from-teal/20 dark:via-surface/95 dark:to-accent/20 dark:shadow-[0_18px_60px_-35px_rgba(56,189,248,0.35)]">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="max-w-2xl">
+                  <p className="text-xs uppercase tracking-[0.3em] text-teal">Guide selection</p>
+                  <h2 className="mt-2 text-3xl font-display text-foreground leading-tight">
+                    Pick a local guide for {city}
                   </h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Select one local guide to compare their recommendations with the city top ten.
+                  <p className="mt-3 text-sm text-muted-foreground max-w-xl">
+                    Highlighted guides help you compare trusted local advice with the city’s top recommendations.
                   </p>
                 </div>
-                <span className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-                  {cityGuides.length} guides
+                <span className="rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
+                  {cityGuides.length} available
                 </span>
               </div>
 
-              <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
                 {cityGuides.map((guide) => {
                   const author = usersById[guide.authorId] ?? currentUser;
 
@@ -238,22 +238,22 @@ function Dashboard() {
                       key={guide.id}
                       to="/travel-itinerary"
                       search={{ city, guideId: guide.id }}
-                      className="group rounded-xl border border-border bg-surface p-4 transition hover:border-teal/60 hover:bg-muted/50"
+                      className="group rounded-3xl border border-border bg-card p-5 transition hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-lg"
                     >
                       <div className="flex items-start gap-3">
                         <Avatar initials={author.avatar} size={38} />
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium leading-snug text-foreground">
+                          <p className="text-base font-semibold leading-snug text-foreground">
                             {guide.title}
                           </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
+                          <p className="mt-1 text-sm text-muted-foreground">
                             {author.name} · Updated {guide.updatedAt}
                           </p>
-                          <div className="mt-3 flex flex-wrap gap-1.5">
+                          <div className="mt-3 flex flex-wrap gap-2">
                             {guide.mustVisit.slice(0, 2).map((place) => (
                               <span
                                 key={place}
-                                className="rounded-full bg-card px-2 py-1 text-[11px] text-muted-foreground"
+                                className="rounded-full bg-muted px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-muted-foreground"
                               >
                                 {place.split(" at ")[0].split(" for ")[0]}
                               </span>
@@ -405,12 +405,12 @@ function SummaryLink({
     <Link
       to={to}
       search={{ city }}
-      className="rounded-xl border border-border bg-card p-4 hover:border-teal/50"
+      className="group rounded-3xl border border-border bg-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-teal/50 hover:shadow-md"
     >
-      <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+      <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-muted-foreground">
         {icon} {label}
       </div>
-      <p className="text-lg font-display text-primary">{value}</p>
+      <p className="text-xl font-semibold text-foreground">{value}</p>
     </Link>
   );
 }

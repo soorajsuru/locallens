@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Compass, MapPin, MessageCircle, BookOpen, ArrowRight } from "lucide-react";
+import { ThemeToggle } from "@/components/AppShell";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,6 +29,7 @@ function Landing() {
           <span className="text-xl font-display tracking-tight text-primary">LocalLens</span>
         </div>
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <Link to="/login" className="text-sm px-4 py-2 rounded-md hover:bg-muted transition-colors">
             Log in
           </Link>
